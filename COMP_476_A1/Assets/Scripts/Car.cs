@@ -5,6 +5,7 @@ using UnityEngine;
 public class Car : MonoBehaviour
 {
     public float start_velocity;
+    public static float reset_offset = 0.8f;
 
     // Start is called before the first frame update
     void Start()
@@ -15,6 +16,6 @@ public class Car : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        gameObject.transform.position = new Vector3(gameObject.transform.position.x + start_velocity, gameObject.transform.position.y, gameObject.transform.position.z);
+        gameObject.transform.position = new Vector3(gameObject.transform.position.x, gameObject.transform.position.y, gameObject.transform.position.z + start_velocity);
     }
 }
