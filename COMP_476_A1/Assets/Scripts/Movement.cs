@@ -7,6 +7,11 @@ public abstract class Movement
     private Vector3 target;
     private GameObject target_obj;
 
+    public float DistanceToTarget
+    {
+        get { return (Target - Position).magnitude; }
+    }
+
     public Vector3 Target
     {
         get { return target; }
@@ -32,6 +37,12 @@ public abstract class Movement
         get { return car.MaxVelocity; }
     }
 
+    public float Velocity
+    {
+        get { return car.Velocity; }
+        set { car.Velocity = value; }
+    }
+
     public Movement(Car car, GameObject target_obj)
     {
         this.car = car;
@@ -46,11 +57,32 @@ public abstract class AlignedMovement : Movement
 {
     protected const float time_to_target = 1.0f;
     protected const float radius_of_satisfaction = 0.02f;
-    protected const float angular_radius_of_satisfaction = 0.05f;
+    protected const float angular_radius_of_satisfaction = 1.0f;
     protected const float angular_slow_down_radius = 10.0f;
     protected const float angular_time_to_target = 1.0f;
+    protected const float cone_of_perception_distance = 1.0f;
+    protected const float max_cone_radius = 45.0f;
+    private bool aligned = false;
 
     public AlignedMovement(Car car, GameObject target_obj) : base(car, target_obj) { }
+
+    public bool TargetWithinCone
+    {
+        get {
+            Vector3 dir = Target - Position;
+            Quaternion target_rotation = Quaternion.LookRotation(dir, Vector3.up);
+            float target_rotation_euler = target_rotation.eulerAngles.y;
+            if (target_rotation_euler > 180)
+                target_rotation_euler = target_rotation_euler - 360.0f;
+
+            return Mathf.Abs((Orientation - target_rotation_euler)) < (ConeRadius / 2);
+        }
+    }
+
+    public float ConeRadius
+    {
+        get { return (Velocity - MaxVelocity) / max_cone_radius; }
+    }
 
     public float MaxAngularVelocity
     {
@@ -68,6 +100,12 @@ public abstract class AlignedMovement : Movement
         get { return Car.MaxAngularAcceleration; }
     }
 
+    public bool Aligned
+    {
+        get { return aligned; }
+        set { aligned = value; }
+    }
+
     public float Orientation
     {
         get {
@@ -83,36 +121,27 @@ public abstract class AlignedMovement : Movement
             Car.gameObject.transform.rotation = quat; }
     }
 
-    public abstract void Align();
-}
-
-public class KinematicSeek : AlignedMovement
-{
-    public KinematicSeek(Car car, GameObject target_obj) : base(car, target_obj) { }
-
-    public override void Move()
+    protected void StopAlignAndMove()
     {
-        //Debug.Log("Car: " + Position.ToString() + " Target: " + Target.ToString());
-        //------------------------------ VELOCITY DIRECTION --------------------------------//
-        
-        //the direction of the velocity is computed by taking the difference between the position of the target and the character
-        Vector3 velocity_dir = Target - Position;
-        //Now that we have the direction we need to normalize it
-        velocity_dir = velocity_dir.normalized;
+        if (!Aligned)
+            Align();
 
-        //-------------------------------- SEEK VELOCITY ---------------------------------//
-
-        //Now that the velocity direction has been computed we need to calculate the seek velocity
-        //this is done by multiplying the max velocity of the car by the velocity direction (normalized)
-        Vector3 seek_velocity = MaxVelocity * velocity_dir;
-
-        //------------------------------- POSITION UPDATE -------------------------------//
-
-        //the final step is to use the seek velocity to update the position of the car
-        Position = Position + seek_velocity * Time.deltaTime;
+        else
+        {
+            Aligned = false;
+            move();
+        }
     }
 
-    public override void Align()
+    protected void AlignAndMove()
+    {
+        Align();
+        move();
+    }
+
+    protected abstract void move();
+
+    protected virtual void Align()
     {
         //----------------------------- LOOK DIRECTION ---------------------------//
 
@@ -137,12 +166,224 @@ public class KinematicSeek : AlignedMovement
         float rotation_diff = target_rotation_euler - Orientation;
 
         //------------------------------------- RADIUS OF SATISFACTION CHECK ---------------------------------//
-        
+
         //we need to check if we are within the radius of satifaction, it which case, we should stop rotating the character
         //set its orientation to that of the target, and return
-        if(Mathf.Abs(rotation_diff) < angular_radius_of_satisfaction)
+        if (Mathf.Abs(rotation_diff) < angular_radius_of_satisfaction)
         {
             Orientation = target_rotation_euler;
+            Aligned = true;
+            return;
+        }
+
+        //if this was not the case we need to keep rotating
+
+        //-------------------------------------- GOAL ANGULAR VELOCITY -------------------------------------//
+
+        //first step is to compute the goal angular velocity, which is the speed to the target based on time to target and angle from target
+        float goal_angular_velocity = MaxAngularVelocity * rotation_diff / angular_slow_down_radius;
+
+        //with the goal angular acceleration the character should have based on time to target
+        float ang_acc = MaxAngularAcceleration;
+
+        //we only change the angular acceleration if if its less than the max acceleration, otherwise acceleration is capped at its max
+        float char_acc = (goal_angular_velocity - AngularVelocity) / angular_time_to_target;
+
+        if (char_acc < ang_acc)
+            ang_acc = char_acc;
+
+        //------------------------------------ CAR VELOCITY ----------------------------------------//
+
+        //Now that we have the car's accelertion, we can recompute its angular velocity
+
+        AngularVelocity = AngularVelocity + ang_acc * Time.deltaTime;
+
+        //------------------------------------- CAR ORIENTATION ---------------------------------//
+
+        //finally we compute the new orientation based on the new velocity
+
+        Orientation = Orientation + AngularVelocity * Time.deltaTime;
+    }
+
+}
+
+public abstract class ReachMovement : AlignedMovement
+{
+    public ReachMovement(Car car, GameObject target_obj) : base(car, target_obj) { }
+
+    public override void Move()
+    {
+        if (Velocity < 0.1 * MaxVelocity)
+        {
+            if (DistanceToTarget < cone_of_perception_distance)
+                move();
+
+            else
+                StopAlignAndMove();
+        }
+
+        else
+        {
+            if (TargetWithinCone)
+                AlignAndMove();
+
+            else
+                StopAlignAndMove();
+        }
+    }
+}
+
+public class KinematicSeek : ReachMovement
+{
+    public KinematicSeek(Car car, GameObject target_obj) : base(car, target_obj) { }
+
+    protected override void move()
+    {
+        //Debug.Log("Car: " + Position.ToString() + " Target: " + Target.ToString());
+        //------------------------------ VELOCITY DIRECTION --------------------------------//
+
+        //the direction of the velocity is computed by taking the difference between the position of the target and the character
+        Vector3 velocity_dir = Target - Position;
+        //Now that we have the direction we need to normalize it
+        velocity_dir = velocity_dir.normalized;
+
+        //-------------------------------- SEEK VELOCITY ---------------------------------//
+
+        //Now that the velocity direction has been computed we need to calculate the seek velocity
+        //this is done by multiplying the max velocity of the car by the velocity direction (normalized)
+        Vector3 seek_velocity = MaxVelocity * velocity_dir;
+
+        //set the velocity of the car to the seek velocity
+        Velocity = seek_velocity.magnitude;
+
+        //------------------------------- POSITION UPDATE -------------------------------//
+
+        //the final step is to use the seek velocity to update the position of the car
+        Position = Position + seek_velocity * Time.deltaTime;
+    }
+}
+
+public class KinematicArrive : ReachMovement
+{
+    public KinematicArrive(Car car, GameObject target_obj) : base(car, target_obj) { }
+
+    protected override void move()
+    {
+        //------------------------------ VELOCITY DIRECTION --------------------------------//
+
+        //the direction of the velocity is computed by taking the difference between the position of the target and the character
+        Vector3 velocity_dir = Target - Position;
+        //Now that we have the direction we need to normalize it
+        velocity_dir = velocity_dir.normalized;
+
+        //----------------------------- VELOCITY MAGNITUDE -------------------------------//
+
+        //the next step is to determine the magnitude of the velocity to use. This will either be the maximum velocity, or 
+        //the velocity based on the time to target. Whichever is smallest will be the one we choose.
+        float char_to_target_speed = (Target - Position).magnitude / time_to_target;
+        float velocity = 0.0f;
+
+        if (MaxVelocity < char_to_target_speed)
+            velocity = MaxVelocity;
+
+        else
+            velocity = char_to_target_speed;
+
+        Velocity = velocity;
+
+        //now that we have the velocity we will need to check if we should stop
+
+        //-------------------------------- RADIUS OF SATISFACTION CHECK ----------------------//
+
+        //to check if we should stop, we check how far we are to the target. If the distance is less than the radius of satisfaction,
+        //we set the position of the car to the position of the target and return
+
+        if ((Target - Position).magnitude < radius_of_satisfaction)
+        {
+            Position = Target;
+            return;
+        }
+
+        //if we are outside the radius of satisfaction, we need to move with the prescribed velocity
+        Vector3 v_move = velocity * velocity_dir;
+        Position = Position + v_move * Time.deltaTime;
+    }
+}
+
+public abstract class EvadeMovement : AlignedMovement
+{
+    public EvadeMovement(Car car, GameObject target_obj) : base(car, target_obj) { }
+
+    public override void Move()
+    {
+        if (DistanceToTarget < cone_of_perception_distance)
+            move();
+        else
+            StopAlignAndMove();
+    }
+}
+
+public class KinematicFlee : EvadeMovement
+{
+    public KinematicFlee(Car car, GameObject target_obj) : base(car, target_obj) { }
+
+    protected override void move()
+    {
+        //Debug.Log("Car: " + Position.ToString() + " Target: " + Target.ToString());
+        //------------------------------ VELOCITY DIRECTION --------------------------------//
+
+        //the direction of the velocity is computed by taking the difference between the position of the target and the character
+        Vector3 velocity_dir = Position - Target;
+        //Now that we have the direction we need to normalize it
+        velocity_dir = velocity_dir.normalized;
+
+        //-------------------------------- SEEK VELOCITY ---------------------------------//
+
+        //Now that the velocity direction has been computed we need to calculate the seek velocity
+        //this is done by multiplying the max velocity of the car by the velocity direction (normalized)
+        Vector3 seek_velocity = MaxVelocity * velocity_dir;
+
+        //set the velocity of the car to the seek velocity
+        Velocity = seek_velocity.magnitude;
+
+        //------------------------------- POSITION UPDATE -------------------------------//
+
+        //the final step is to use the seek velocity to update the position of the car
+        Position = Position + seek_velocity * Time.deltaTime;
+    }
+
+    protected override void Align()
+    {
+        //----------------------------- LOOK DIRECTION ---------------------------//
+
+        //the first thing we need to do here is determine the target orientation
+        //this is done by taking the difference in the orientation of the line connection the car and target and the current orientation
+        //of the car
+        //first lets find the orientation of that line
+        //lets get the direction from the position of the car to the target
+        Vector3 dir = Position - Target;
+
+        //next lets create the target rotation, which is the orientation to the target position
+        Quaternion target_rotation = Quaternion.LookRotation(dir, Vector3.up);
+        float target_rotation_euler = target_rotation.eulerAngles.y;
+
+        //since we want the target rotation to be signed, if it is larger than 180 degrees, we will make it negative from 0
+        if (target_rotation_euler > 180)
+            target_rotation_euler = target_rotation_euler - 360.0f;
+
+        //we only allow the character to rotate around the y_axis, therefore we only need the angle around y axis that separates
+        //the car and the target
+
+        float rotation_diff = target_rotation_euler - Orientation;
+
+        //------------------------------------- RADIUS OF SATISFACTION CHECK ---------------------------------//
+
+        //we need to check if we are within the radius of satifaction, it which case, we should stop rotating the character
+        //set its orientation to that of the target, and return
+        if (Mathf.Abs(rotation_diff) < angular_radius_of_satisfaction)
+        {
+            Orientation = target_rotation_euler;
+            Aligned = true;
             return;
         }
 
@@ -176,48 +417,49 @@ public class KinematicSeek : AlignedMovement
     }
 }
 
-public class KinematicArrive : KinematicSeek
+public class Wander : AlignedMovement
 {
-    
-    public KinematicArrive(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public Wander(Car car, GameObject target_obj) : base(car, target_obj) { }
 
-    public override void Move()
+    protected override void move()
     {
+        //Debug.Log("Car: " + Position.ToString() + " Target: " + Target.ToString());
         //------------------------------ VELOCITY DIRECTION --------------------------------//
 
         //the direction of the velocity is computed by taking the difference between the position of the target and the character
-        Vector3 velocity_dir = Target - Position;
+        Vector3 velocity_dir = Car.transform.forward;
         //Now that we have the direction we need to normalize it
         velocity_dir = velocity_dir.normalized;
 
-        //----------------------------- VELOCITY MAGNITUDE -------------------------------//
+        //-------------------------------- SEEK VELOCITY ---------------------------------//
 
-        //the next step is to determine the magnitude of the velocity to use. This will either be the maximum velocity, or 
-        //the velocity based on the time to target. Whichever is smallest will be the one we choose.
-        float char_to_target_speed = (Target - Position).magnitude / time_to_target;
-        float velocity = 0.0f;
+        //Now that the velocity direction has been computed we need to calculate the seek velocity
+        //this is done by multiplying the max velocity of the car by the velocity direction (normalized)
+        Vector3 seek_velocity = MaxVelocity * velocity_dir;
 
-        if (MaxVelocity < char_to_target_speed)
-            velocity = MaxVelocity;
+        //set the velocity of the car to the seek velocity
+        Velocity = seek_velocity.magnitude;
 
-        else
-            velocity = char_to_target_speed;
+        //------------------------------- POSITION UPDATE -------------------------------//
 
-        //now that we have the velocity we will need to check if we should stop
+        //the final step is to use the seek velocity to update the position of the car
+        Position = Position + seek_velocity * Time.deltaTime;
+    }
 
-        //-------------------------------- RADIUS OF SATISFACTION CHECK ----------------------//
+    protected override void Align()
+    {
+        //alignment is done with kinematic align
+        //we need to generate a random number between -1 and 1 to determine the angular acceleration
 
-        //to check if we should stop, we check how far we are to the target. If the distance is less than the radius of satisfaction,
-        //we set the position of the car to the position of the target and return
+        float speed_mult = Random.Range(-5.0f, 5.0f);
 
-        if ((Target - Position).magnitude < radius_of_satisfaction)
-        {
-            Position = Target;
-            return;
-        }
+        float angular_speed = speed_mult * MaxAngularVelocity;
 
-        //if we are outside the radius of satisfaction, we need to move with the prescribed velocity
-        Vector3 v_move = velocity * velocity_dir;
-        Position = Position + v_move * Time.deltaTime;
+        Orientation = Orientation + angular_speed * Time.deltaTime;
+    }
+
+    public override void Move()
+    {
+        AlignAndMove();
     }
 }

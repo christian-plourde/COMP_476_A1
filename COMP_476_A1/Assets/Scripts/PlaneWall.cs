@@ -20,6 +20,9 @@ public class PlaneWall : MonoBehaviour
 
     void OnTriggerEnter(Collider col)
     {
+        if (!col.gameObject.CompareTag("Tag") && !col.gameObject.CompareTag("Car"))
+            return;
+
         //on collision entry, check the position of the pair wall compared to that of its pair wall
         col.transform.position += (pair_wall.transform.position - transform.position);
 

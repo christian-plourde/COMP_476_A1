@@ -166,7 +166,6 @@ GameObject:
   - component: {fileID: 458156558}
   - component: {fileID: 458156557}
   - component: {fileID: 458156556}
-  - component: {fileID: 458156560}
   m_Layer: 0
   m_Name: Plane
   m_TagString: Untagged
@@ -248,18 +247,6 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &458156560
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 458156555}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a9214f2ebc9c5b947a16756518172fcd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &506384903
 GameObject:
   m_ObjectHideFlags: 0
@@ -399,6 +386,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Car (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6654139889893509533, guid: 772b0e33dcb43fd4bb9c9b5864a10932,
+        type: 3}
+      propertyPath: m_TagString
+      value: Car
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 772b0e33dcb43fd4bb9c9b5864a10932, type: 3}
@@ -574,6 +566,11 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Name
       value: Car (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 6654139889893509533, guid: 772b0e33dcb43fd4bb9c9b5864a10932,
+        type: 3}
+      propertyPath: m_TagString
+      value: Car
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 772b0e33dcb43fd4bb9c9b5864a10932, type: 3}
@@ -1005,6 +1002,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Car (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 6654139889893509533, guid: 772b0e33dcb43fd4bb9c9b5864a10932,
+        type: 3}
+      propertyPath: m_TagString
+      value: Car
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 772b0e33dcb43fd4bb9c9b5864a10932, type: 3}
 --- !u!1 &1947891701
@@ -1194,6 +1196,11 @@ PrefabInstance:
     - target: {fileID: 6654139889893509533, guid: 772b0e33dcb43fd4bb9c9b5864a10932,
         type: 3}
       propertyPath: m_Name
+      value: Car
+      objectReference: {fileID: 0}
+    - target: {fileID: 6654139889893509533, guid: 772b0e33dcb43fd4bb9c9b5864a10932,
+        type: 3}
+      propertyPath: m_TagString
       value: Car
       objectReference: {fileID: 0}
     m_RemovedComponents: []
