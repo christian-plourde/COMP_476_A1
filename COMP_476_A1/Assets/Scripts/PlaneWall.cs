@@ -39,6 +39,7 @@ public class PlaneWall : MonoBehaviour
         else if (diff.z > 0)
             col.transform.position = new Vector3(col.transform.position.x, col.transform.position.y, col.transform.position.z - Car.reset_offset);
 
+        col.gameObject.GetComponent<Car>().IncrementPassedWalls();
         col.gameObject.GetComponent<Car>().Movement.resetTarget();
     }
 }

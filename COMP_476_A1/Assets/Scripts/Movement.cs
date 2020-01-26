@@ -5,7 +5,6 @@ public abstract class Movement
 {
     private Car car;
     private Vector3 target;
-    private GameObject target_obj;
 
     public float DistanceToTarget
     {
@@ -16,8 +15,6 @@ public abstract class Movement
     {
         get { return target; }
         set { target = value;
-            //also update the position of the target
-            target_obj.transform.position = target;
         }
     }
 
@@ -43,11 +40,9 @@ public abstract class Movement
         set { car.Velocity = value; }
     }
 
-    public Movement(Car car, GameObject target_obj)
+    public Movement(Car car)
     {
         this.car = car;
-        this.target_obj = target_obj;
-        this.target_obj = GameObject.Instantiate(target_obj, target, Quaternion.identity);
     }
 
     public abstract void Move();
@@ -57,14 +52,14 @@ public abstract class AlignedMovement : Movement
 {
     protected const float time_to_target = 1.0f;
     protected const float radius_of_satisfaction = 0.02f;
-    protected const float angular_radius_of_satisfaction = 1.0f;
+    protected const float angular_radius_of_satisfaction = 5.0f;
     protected const float angular_slow_down_radius = 10.0f;
     protected const float angular_time_to_target = 1.0f;
     protected const float cone_of_perception_distance = 1.0f;
     protected const float max_cone_radius = 45.0f;
     private bool aligned = false;
 
-    public AlignedMovement(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public AlignedMovement(Car car) : base(car) { }
 
     public bool TargetWithinCone
     {
@@ -124,7 +119,9 @@ public abstract class AlignedMovement : Movement
     protected void StopAlignAndMove()
     {
         if (!Aligned)
+        {
             Align();
+        }
 
         else
         {
@@ -198,6 +195,9 @@ public abstract class AlignedMovement : Movement
 
         AngularVelocity = AngularVelocity + ang_acc * Time.deltaTime;
 
+        if (AngularVelocity > MaxAngularVelocity)
+            AngularVelocity = MaxAngularVelocity;
+
         //------------------------------------- CAR ORIENTATION ---------------------------------//
 
         //finally we compute the new orientation based on the new velocity
@@ -211,7 +211,7 @@ public abstract class AlignedMovement : Movement
 
 public abstract class ReachMovement : AlignedMovement
 {
-    public ReachMovement(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public ReachMovement(Car car) : base(car) { }
 
     public override void Move()
     {
@@ -237,7 +237,7 @@ public abstract class ReachMovement : AlignedMovement
 
 public class KinematicSeek : ReachMovement
 {
-    public KinematicSeek(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public KinematicSeek(Car car) : base(car) { }
 
     protected override void move()
     {
@@ -272,7 +272,7 @@ public class KinematicSeek : ReachMovement
 
 public class KinematicArrive : ReachMovement
 {
-    public KinematicArrive(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public KinematicArrive(Car car) : base(car) { }
 
     protected override void move()
     {
@@ -322,9 +322,42 @@ public class KinematicArrive : ReachMovement
     }
 }
 
+public class Pursue : KinematicSeek
+{
+    private Car target_car;
+
+    public Car TargetCar
+    {
+        get { return target_car; }
+        set { target_car = value; }
+    }
+
+    public Pursue(Car car, Car target_car) : base(car) { this.target_car = target_car; target_car.IsTagTarget = true; }
+
+    public override void resetTarget()
+    {
+        try
+        {
+           Target = target_car.Position;
+        }
+
+        catch
+        {
+
+        }
+        
+    }
+
+    protected override void move()
+    {
+        resetTarget();
+        base.move();
+    }
+}
+
 public abstract class EvadeMovement : AlignedMovement
 {
-    public EvadeMovement(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public EvadeMovement(Car car) : base(car) { }
 
     public override void Move()
     {
@@ -337,7 +370,7 @@ public abstract class EvadeMovement : AlignedMovement
 
 public class KinematicFlee : EvadeMovement
 {
-    public KinematicFlee(Car car, GameObject target_obj) : base(car, target_obj) { }
+    public KinematicFlee(Car car) : base(car) { }
 
     protected override void move()
     {
@@ -421,6 +454,9 @@ public class KinematicFlee : EvadeMovement
 
         AngularVelocity = AngularVelocity + ang_acc * Time.deltaTime;
 
+        if (AngularVelocity > MaxAngularVelocity)
+            AngularVelocity = MaxAngularVelocity;
+
         //------------------------------------- CAR ORIENTATION ---------------------------------//
 
         //finally we compute the new orientation based on the new velocity
@@ -434,14 +470,39 @@ public class KinematicFlee : EvadeMovement
     }
 }
 
+public class Evade : KinematicFlee
+{
+    private Car target_car;
+
+    public Car TargetCar
+    {
+        get { return target_car; }
+        set { target_car = value; }
+    }
+
+    public Evade(Car car, Car target_car) : base(car) { this.target_car = target_car; }
+
+    public override void resetTarget()
+    {
+        Target = target_car.Position;
+    }
+
+    protected override void move()
+    {
+        resetTarget();
+        base.move();
+    }
+
+}
+
 public class Wander : AlignedMovement
 {
     private const float wander_target_distance = 1.0f;
-    private const float wander_target_radius = 1.0f;
+    private const float wander_target_radius = 0.6f;
     private const float target_radius_of_satisfaction = 0.2f;
     private bool first_run = true;
 
-    public Wander(Car car, GameObject target_obj) : base(car, target_obj) 
+    public Wander(Car car) : base(car) 
     {
         Random.InitState((int)System.DateTime.Now.Ticks);
     }
@@ -462,7 +523,7 @@ public class Wander : AlignedMovement
                                     circle_vector.y, 
                                     -1 * circle_vector.z * Mathf.Sin(angle) + circle_vector.z * Mathf.Cos(angle));
 
-        Target = Target + circle_vector;
+        Target = Target + 1.2f*circle_vector;
     }
 
     protected override void move()
