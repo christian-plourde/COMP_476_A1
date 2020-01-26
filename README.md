@@ -47,9 +47,9 @@ The Car class has an AlignedMovement field that can be changed at runtime. In it
 Colors
 -------------------------------
 
-<span style="color:red">Seeker.</span>
-<span style="color:blue">Regular AI character or Frozen Character.</span>
-<span style="color:green">AI Character being chased.</span>
+<span style="color:red"> Red: Seeker.</span><br />
+<span style="color:blue">Blue: Regular AI character or Frozen Character.</span><br />
+<span style="color:green">Green: AI Character being chased.</span><br />
 
 AI Behaviours
 -------------------------------
