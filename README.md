@@ -1,3 +1,5 @@
+<!DOCTYPE md>
+
 COMP 476 Assignment 1
 ------------------------------
 
