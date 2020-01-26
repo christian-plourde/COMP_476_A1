@@ -205,6 +205,8 @@ public abstract class AlignedMovement : Movement
         Orientation = Orientation + AngularVelocity * Time.deltaTime;
     }
 
+    public abstract void resetTarget();
+
 }
 
 public abstract class ReachMovement : AlignedMovement
@@ -261,6 +263,11 @@ public class KinematicSeek : ReachMovement
         //the final step is to use the seek velocity to update the position of the car
         Position = Position + seek_velocity * Time.deltaTime;
     }
+
+    public override void resetTarget()
+    {
+        
+    }
 }
 
 public class KinematicArrive : ReachMovement
@@ -307,6 +314,11 @@ public class KinematicArrive : ReachMovement
         //if we are outside the radius of satisfaction, we need to move with the prescribed velocity
         Vector3 v_move = velocity * velocity_dir;
         Position = Position + v_move * Time.deltaTime;
+    }
+
+    public override void resetTarget()
+    {
+
     }
 }
 
@@ -415,19 +427,50 @@ public class KinematicFlee : EvadeMovement
 
         Orientation = Orientation + AngularVelocity * Time.deltaTime;
     }
+
+    public override void resetTarget()
+    {
+
+    }
 }
 
 public class Wander : AlignedMovement
 {
-    public Wander(Car car, GameObject target_obj) : base(car, target_obj) { }
+    private const float wander_target_distance = 1.0f;
+    private const float wander_target_radius = 1.0f;
+    private const float target_radius_of_satisfaction = 0.2f;
+    private bool first_run = true;
+
+    public Wander(Car car, GameObject target_obj) : base(car, target_obj) 
+    {
+        Random.InitState((int)System.DateTime.Now.Ticks);
+    }
+
+    public override void resetTarget()
+    {
+        //------------------------------ RESETTING THE TARGET POSITION ----------------------//
+
+        //We need to reset the target position. In order to do this, we pick a point in front of the car, with a fixed distance away
+        Target = (Car.transform.forward.normalized * wander_target_distance) + Position;
+
+        Vector3 circle_vector = (Car.transform.forward.normalized * wander_target_radius);
+
+        //now we need to rotate this vector with a random angle around the y axis
+        float angle = Random.Range(0.0f, 360.0f);
+
+        circle_vector = new Vector3(circle_vector.x * Mathf.Cos(angle) + circle_vector.z * Mathf.Sin(angle),
+                                    circle_vector.y, 
+                                    -1 * circle_vector.z * Mathf.Sin(angle) + circle_vector.z * Mathf.Cos(angle));
+
+        Target = Target + circle_vector;
+    }
 
     protected override void move()
     {
-        //Debug.Log("Car: " + Position.ToString() + " Target: " + Target.ToString());
         //------------------------------ VELOCITY DIRECTION --------------------------------//
 
         //the direction of the velocity is computed by taking the difference between the position of the target and the character
-        Vector3 velocity_dir = Car.transform.forward;
+        Vector3 velocity_dir = Target - Position;
         //Now that we have the direction we need to normalize it
         velocity_dir = velocity_dir.normalized;
 
@@ -446,20 +489,14 @@ public class Wander : AlignedMovement
         Position = Position + seek_velocity * Time.deltaTime;
     }
 
-    protected override void Align()
-    {
-        //alignment is done with kinematic align
-        //we need to generate a random number between -1 and 1 to determine the angular acceleration
-
-        float speed_mult = Random.Range(-5.0f, 5.0f);
-
-        float angular_speed = speed_mult * MaxAngularVelocity;
-
-        Orientation = Orientation + angular_speed * Time.deltaTime;
-    }
-
     public override void Move()
     {
+        if(DistanceToTarget <= target_radius_of_satisfaction || first_run)
+        {
+            resetTarget();
+            first_run = false;
+        }
+
         AlignAndMove();
     }
 }

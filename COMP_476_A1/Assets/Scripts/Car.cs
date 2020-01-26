@@ -12,12 +12,13 @@ public class Car : MonoBehaviour
 
     private float max_angular_velocity = 20.0f;
     private float angular_velocity = 0.0f;
-    private float max_angular_acceleration = 20.0f;
+    private float max_angular_acceleration = 50.0f;
 
     private bool frozen = false;
 
     public AlignedMovement Movement
     {
+        get { return movement; }
         set { movement = value; }
     }
 
